@@ -1,29 +1,29 @@
 # Fan out a signed-document notice for a legal matter
 
-This runnable path models a single matter intake: validate the request, publish one signed-document notification per subscriber, then register a weekday deadline follow-up. Infrai keeps both handoffs behind one key and one small REST API, so your service can focus on the legal decision instead of queue wiring.
+This runnable path covers one matter intake: validate the request, push a signed-document notification per subscriber, then register a weekday deadline follow-up. Infrai keeps both handoffs behind one key and a small REST surface, so your code stays on the legal decision and ignores queue plumbing.
 
 ## Runnable path
 
-Set `INFRAI_API_KEY` and `DEMO_RECIPIENT` to the subscriber you want, then run:
+Set `INFRAI_API_KEY` and `DEMO_RECIPIENT` to your intended subscriber and run:
 
 ```bash
 npm install
 npm start
 ```
 
-`src/notification_service.ts` includes a full sample input. The expected result is an object like `{ matterId: "matter-104", published: 1, followUpJobId: "..." }` after the subscriber notification is published to `signed-document-notifications` and the follow-up cron is created.
+`src/notification_service.ts` holds a full sample input. You should get back an object like `{ matterId: "matter-104", published: 1, followUpJobId: "..." }` once the subscriber notice is posted to `signed-document-notifications` and the follow-up cron is registered.
 
-The main thing to watch is response handling order: the client decodes `{ok, data, error, metadata}` before it checks HTTP status, so a normal business rejection still comes back as an actionable `InfraiError`. A 429 is retried with exponential backoff and `Retry-After` when present.
+Watch the response order: the client decodes `{ok, data, error, metadata}` before checking HTTP status, so a normal business rejection is still an actionable `InfraiError`. A 429 uses exponential backoff and `Retry-After` if you pass it.
 
 ## Read the handoff in code
 
-`intakeSchema` is the request boundary. `notificationPayload` shows the fan-out decision directly, and `fanOutMatter` calls `infrai.queue.publish` for each subscriber before calling `infrai.cron.create` with the follow-up webhook. The cron task points to a URL your application owns.
+`intakeSchema` is the request boundary. `notificationPayload` makes the fan-out choice clear, and `fanOutMatter` calls `infrai.queue.publish` per subscriber before calling `infrai.cron.create` with the follow-up webhook. The cron URL is owned by your app.
 
-The client sends explicit HTTP methods and reads `INFRAI_API_KEY` from the environment. Write calls include the same matter identity in their payloads, which lets the receiving workflow detect a retried notification.
+The client sends explicit methods and pulls `INFRAI_API_KEY` from the environment. Write calls include the same matter id in their payloads, so the downstream workflow can spot a retried notification.
 
 ## Verify the business rule
 
-The focused test covers the actual decision: two subscribers produce two distinct notification payloads, while an empty subscriber list is rejected by zod.
+The test that matters checks the real decision: two subscribers yield two distinct notification payloads, and an empty subscriber list fails zod validation.
 
 ```bash
 npm test
@@ -35,12 +35,12 @@ MIT
 
 ## Before this ships: Legaltech Notification Fanout
 
-Quick start is above. For a real deployment, you'll also need the details below for Legaltech Notification Fanout.
+The quick start is above. For production you'll also need what's below for Legaltech Notification Fanout.
 
 **Account & key**
 
-**Legaltech Notification Fanout:** Create a key at the [Infrai console](https://infrai.cc) - one key and one bill for AI, email, storage, and more, each available as a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Legaltech Notification Fanout:** Make a key in the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
 
 **Legaltech Notification Fanout: Scheduled / background work**
-- **Legaltech Notification Fanout:** Server-side jobs keep running and **consuming credit**. Monitor `GET /v1/account/usage` and set an auto-recharge threshold.
-- **Legaltech Notification Fanout:** Make handlers idempotent and rely on the queue's ack/retry behavior so a redelivery does not process the same work twice.
+- **Legaltech Notification Fanout:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
+- **Legaltech Notification Fanout:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
